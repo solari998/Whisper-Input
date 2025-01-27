@@ -1,39 +1,33 @@
 import os
-import requests
-from dotenv import load_dotenv
+from ..transcription.whisper import WhisperProcessor
+from ..transcription.senseVoiceSmall import SenseVoiceSmallProcessor
 
-load_dotenv()
-
-class TranslateProcessor:
+class Translator:
     def __init__(self):
-        self.url = "https://api.siliconflow.cn/v1/chat/completions"
-        self.headers = {
-            'Authorization': f"Bearer {os.getenv('SILICONFLOW_API_KEY')}",
-            "Content-Type": "application/json"
-        }
-        self.model = os.getenv("SILICONFLOW_TRANSLATE_MODEL", "THUDM/glm-4-9b-chat")
-
+        self._whisper = WhisperProcessor()
+        self._sense_voice = SenseVoiceSmallProcessor()
+    
     def translate(self, text):
-        system_prompt = """
-        You are a translation assistant.
-        Please translate the user's input into English.
+        """将文本翻译为英文
+        
+        Args:
+            text: 要翻译的文本
+            
+        Returns:
+            tuple: (翻译后的文本, 错误信息)
         """
-
-        payload = {
-            "model": self.model,
-            "messages":[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
-        }
-        try:
-            response = requests.request("POST", self.url, headers=self.headers, json=payload)
-            return response.json().get('choices', [{}])[0].get('message', {}).get('content', '')
-        except Exception as e:
-            return text, e
+        if not text:
+            return None, "没有需要翻译的文本"
+            
+        # 根据配置选择服务
+        service = os.getenv("SERVICE_PLATFORM", "siliconflow").lower()
+        
+        if service == "groq":
+            processor = self._whisper
+        elif service == "siliconflow":
+            processor = self._sense_voice
+        else:
+            return None, f"无效的服务平台: {service}"
+            
+        # 调用翻译模式
+        return processor.process_audio(text, mode="translations", prompt="")
